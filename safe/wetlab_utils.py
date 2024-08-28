@@ -1168,42 +1168,90 @@ def correct_buffer(r, max_vol=2):
 
 
 def gen_ot2_script(
-    df, 
+    df,
     sec_instrument,
     normalize=True,
-    filename='',
-    date=today, 
-    template='/home/bwicky/ot2/templates/SEC_pool_and_norm_v3.py'
+    separate_non_normed=False,
+    filename="",
+    path="",
+    date=today,
+    template="/net/software/lab/cowboy/SEC_pool_and_norm_v3.py",
 ):
-    '''
+    """
     Generate OT-2 script for pooling and normalising SEC fractions.
-    
+
     df: dataframe containing the experimental data.
-    
+
     filename: filename for the generated script.
-    
+
     date: string of the date that gets append to the output files.
-    
+
     template: path to an OT-2 protocol template.
-    '''
+    """
 
-    
-    file_name = f'{date}_{filename}sec_pool_and_norm'
-    
-    print(f'{file_name}.py contains transfers from {len(np.hstack(df.pooled_fractions.to_list()))} fractions to {len(df)} destination wells')
-    
-    ot2_transfers = ''
+    file_name = f"{path}{date}_{filename}sec_pool_and_norm"
+    if separate_non_normed == False:
+        print(
+            f"{file_name}.py contains transfers from {len(np.hstack(df.pooled_fractions.to_list()))} fractions to {len(df)} destination wells"
+        )
+
+    ot2_transfers = ""
+    non_normed_transfers = ""
     for i, r in df.iterrows():
-        ot2_transfers += f"[{list(r.pooled_fractions)}, {list(r.pooled_frac_vol * 1e3)}, '{r['Destination Plate Name']}', '{r['Destination Well']}', {r.buffer_vol * 1e3}],\n"
-    
-    ot2_template = open(template, 'r').readlines()
+        pooled_frac_list = " ".join(
+            [
+                f"'{a}',"
+                for a in str(r.pooled_fractions)
+                .replace("['", "")
+                .replace("']", "")
+                .split("' '")
+                if a != ""
+            ]
+        )
 
-    with open(file_name + '.py', 'w') as f:
+        pooled_frac_vol_list = [
+            float(a) * 1e3
+            for a in str(r.pooled_frac_vol).replace("[", "").replace("]", "").split(" ")
+            if a != ""
+        ]
+        buffer_vol = r.buffer_vol * 1e3
+        writestr = f"[ [{pooled_frac_list}], {pooled_frac_vol_list}, {r['Destination Plate Name']}, '{r['Destination Well']}', {buffer_vol:3.3f}],\n"
+        if normalize and separate_non_normed and buffer_vol == 0.000:
+            non_normed_transfers += writestr
+        else:
+            ot2_transfers += writestr
+
+    print(
+        f"{file_name}.py contains transfers to {len(ot2_transfers.splitlines())} destination wells"
+    )
+    print(ot2_transfers)
+    ot2_template = open(template, "r").readlines()
+
+    with open(file_name + ".py", "w") as f:
         for l in ot2_template:
-            modified_line = l.replace('### PROTOCOL_NAME ###', file_name)
-            modified_line = modified_line.replace('### INSTRUMENT ###', sec_instrument)
-            modified_line = modified_line.replace('### NORMALIZE ###', 'True' if normalize else 'False')
-            modified_line = modified_line.replace('### TRANSFERS ###', ot2_transfers)
+            modified_line = l.replace("### PROTOCOL_NAME ###", file_name)
+            modified_line = modified_line.replace("### INSTRUMENT ###", sec_instrument)
+            modified_line = modified_line.replace(
+                "### NORMALIZE ###", "True" if normalize else "False"
+            )
+            modified_line = modified_line.replace("### TRANSFERS ###", ot2_transfers)
             f.write(modified_line)
+    if normalize and separate_non_normed:
+        print(
+            f"{file_name}_non_normed.py contains transfers to {len(non_normed_transfers.splitlines())} destination wells"
+        )
+        print(non_normed_transfers)
+        with open(file_name + "_non_normed.py", "w") as f:
+            for l in ot2_template:
+                modified_line = l.replace("### PROTOCOL_NAME ###", file_name)
+                modified_line = modified_line.replace(
+                    "### INSTRUMENT ###", sec_instrument
+                )
+                modified_line = modified_line.replace("### NORMALIZE ###", "True")
+                modified_line = modified_line.replace(
+                    "### TRANSFERS ###", non_normed_transfers
+                )
+                f.write(modified_line)
 
     return
+
