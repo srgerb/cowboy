@@ -1164,7 +1164,7 @@ def correct_pooled(r, desired_conc, max_vol=1.5):
     elif np.isinf(r.conc_uM):
         return r.pooled_vol
 
-    elif r.buffer_vol + r.pooled_vol > max_vol:
+    elif (r.pooled_vol * (r.conc_uM - desired_conc) / desired_conc) + r.pooled_vol > max_vol:
         if (max_vol * desired_conc)/r.conc_uM < 0.02:
             return 0.02
         else:
@@ -1218,7 +1218,7 @@ def gen_ot2_script(
     """
     
     user = getpass.getuser()
-    file_name = f"{path}{date}_{filename}{user}sec_pool_and_norm"
+    file_name = f"{path}{date}_{filename}{user}_sec_pool_and_norm"
     if separate_non_normed == False:
         print(
             f"{file_name}.py contains transfers from {len(np.hstack(df.pooled_fractions.to_list()))} fractions to {len(df)} destination wells"
@@ -1249,24 +1249,24 @@ def gen_ot2_script(
             non_normed_transfers += writestr
         else:
             ot2_transfers += writestr
-
-    print(
-        f"{file_name}.py contains transfers to {len(ot2_transfers.splitlines())} destination wells"
-    )
+    if normalize and separate_non_normed:
+        print(
+            f"{file_name}.py contains transfers to {len(ot2_transfers.splitlines())} destination wells"
+        )
     print(ot2_transfers)
     ot2_template = open(template, "r").readlines()
 
     with open(file_name + ".py", "w") as f:
         for l in ot2_template:
             modified_line = l.replace("### PROTOCOL_NAME ###", file_name)
-            modified_line = l.replace("### USER_NAME ###", user)
+            modified_line = modified_line.replace("### USER_NAME ###", user)
             modified_line = modified_line.replace("### INSTRUMENT ###", sec_instrument)
             modified_line = modified_line.replace(
                 "### NORMALIZE ###", "True" if normalize else "False"
             )
             modified_line = modified_line.replace("### TRANSFERS ###", ot2_transfers)
             f.write(modified_line)
-    if normalize and separate_non_normed:
+    if separate_non_normed:
         print(
             f"{file_name}_non_normed.py contains transfers to {len(non_normed_transfers.splitlines())} destination wells"
         )
@@ -1274,7 +1274,7 @@ def gen_ot2_script(
         with open(file_name + "_non_normed.py", "w") as f:
             for l in ot2_template:
                 modified_line = l.replace("### PROTOCOL_NAME ###", file_name)
-                modified_line = l.replace("### USER_NAME ###", user) 
+                modified_line = modified_line.replace("### USER_NAME ###", user) 
                 modified_line = modified_line.replace(
                     "### INSTRUMENT ###", sec_instrument
                 )
