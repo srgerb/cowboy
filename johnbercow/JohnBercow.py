@@ -943,9 +943,12 @@ for p in reformated_df['plate_id'].unique():
         txt += idx2row[i] + ' |'
 
         for j, well in enumerate(row):
-
-            if well in plate_df['Well Position'].values:
-                well_content = plate_df[plate_df['Well Position']==well]['design_id'].values[0].center(10)
+            if args.echo:
+                df_well_position = plate_df["Destination Well"]
+            else:
+                df_well_position = plate_df['Well Position']
+            if well in df_well_position.values:
+                well_content = plate_df[df_well_position==well]['design_id'].values[0].center(10)
 
             else:
                 well_content = ''.center(10)
@@ -956,7 +959,6 @@ for p in reformated_df['plate_id'].unique():
 
 with open(f'{filename}_cloning_instructions.txt', 'w') as f:
     f.write(txt)
-    
     
 # Unless supressed, generate cloned plasmid maps.
 if not args.no_plasmids:
